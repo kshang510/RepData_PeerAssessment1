@@ -1,25 +1,111 @@
 ---
 title: "Reproducible Research: Peer Assessment 1"
-output: 
-  html_document:
-    keep_md: true
+author: "Kay Shang"
+date: "December 12, 2014"
+output: html_document
 ---
 
+# Loading and preprocessing the data
+```{r}
+dt<-read.csv("activity.csv", header=TRUE)
+dt$date=as.Date(as.character(dt$date),format="%Y-%m-%d")
+```
 
-## Loading and preprocessing the data
+# What is the total number of steps taken per day ?
+```{r,message=FALSE}
+library(dplyr)
+daily<-group_by(dt,date)
+daily_sum<-summarize(daily, sum_steps=sum(steps))
+hist(daily_sum$sum_steps, main="Histogram of Total Steps per Day",xlab="daily total steps")
+```
+
+```{r}
+## Calculate mean/median value of total daily steps taken
+mean_daily<-mean(daily_sum$sum_steps,na.rm=TRUE)
+median_daily<-median(daily_sum$sum_steps,na.rm=TRUE)
+mean_daily
+median_daily
+```
+
+# What is the average daily activity pattern ?
+```{r}
+intervals<-group_by(dt,interval)
+interval_ave<-summarize(intervals, average_steps=mean(steps,na.rm=TRUE))
+plot(interval_ave$interval,interval_ave$average_steps, type="l", xlab ="interval", ylab ="average steps taken")
+```
 
 
+```{r}
+## Sort the average number of steps taken, then report the 5-minute interval contains maximum number
+sorted_interval<-arrange(interval_ave, desc(average_steps))
+max_interval<-sorted_interval$interval[1]
+```
 
-## What is mean total number of steps taken per day?
+The `r max_interval`th interval contains the maximum number of steps.
+
+# Imputing missing values
+
+```{r}
+## Find the total number of missing values
+total_na <- 0
+for (i in 1:length(dt$steps)) {
+  if (is.na(dt$steps[i])) {
+    total_na <- total_na + 1
+  }
+}
+```
 
 
+```{r}
+## Create a new data set replacing NAs with its corresponding interval mean
+new_dt <- daily
+for (i in 1:length(daily$steps)) {
+  if (is.na(daily$steps[i])) {
+    index <- (daily$interval[i] %/% 100) * 12 + daily$interval[i] %% 100 / 5 +1
+    new_dt$steps[i] <- interval_ave$average_steps[index]
+  }
+}
+```
 
-## What is the average daily activity pattern?
+
+```{r}
+## Make a historgram of the total
+new_daily_sum<-summarize(new_dt, sum_steps=sum(steps))
+hist(new_daily_sum$sum_steps,main="Histogram of Total Steps per Day with NAs Replaced",
+     xlab="daily total steps")
+```
 
 
+```{r}
+## Report mean/median value of total daily steps taken & compared with previous mean/median
+new_mean_daily<-mean(new_daily_sum$sum_steps)
+new_median_daily<-median(new_daily_sum$sum_steps)
+mean_diff <- new_mean_daily - mean_daily
+median_diff <- new_median_daily - median_daily
+new_mean_daily
+new_median_daily
+mean_diff
+median_diff
+```
 
-## Imputing missing values
+# Are there differences in activity patterns between weekdays and weekends ?
+
+```{r}
+## Create weekday factor variable in new_dt
+new_dt$weekday<-as.factor(weekdays(new_dt$date))
+levels(new_dt$weekday)<-c("weekday","weekday","weekday","weekday","weekday","weekend","weekend")
+```
 
 
+```{r}
+## calculate average steps taken per interval and plot
+weekdayIndex <- new_dt$weekday == "weekday"
+weekendIndex <- new_dt$weekday == "weekend"
+weekday_ave<-tapply(new_dt$steps[weekdayIndex],as.factor(new_dt$interval[weekdayIndex]),mean)
+weekend_ave<-tapply(new_dt$steps[weekendIndex],as.factor(new_dt$interval[weekendIndex]),mean)
 
-## Are there differences in activity patterns between weekdays and weekends?
+par(mfcol = c(2,1))
+plot(levels(as.factor(new_dt$interval[weekdayIndex])),weekday_ave, type="l", xlab ="interval", ylab ="WeekDay average steps taken")
+plot(levels(as.factor(new_dt$interval[weekendIndex])),weekend_ave, type="l", xlab ="interval", ylab ="WeekEnd average steps taken")
+```          
+
